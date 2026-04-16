@@ -86,5 +86,25 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="16dp"/>
+    <TextView
+        android:id="@+id/tvSensitivity"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Sensitivity: 5"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        app:layout_constraintTop_toBottomOf="@id/btnStartStop"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="24dp"/>
+
+    <SeekBar
+        android:id="@+id/seekBarSensitivity"
+        android:layout_width="280dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/tvSensitivity"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

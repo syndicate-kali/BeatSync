@@ -11,12 +11,13 @@ import android.media.MediaRecorder
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.widget.Button
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import org.jtransforms.fft.FloatFFT_1D
 import kotlin.math.sqrt
 
 class MainActivity : AppCompatActivity() {
@@ -29,11 +30,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var colorPreview: android.view.View
     private lateinit var btnConnect: Button
     private lateinit var btnStartStop: Button
+    private lateinit var seekBarSensitivity: SeekBar
+    private lateinit var tvSensitivity: TextView
 
     // BLE
     private var bluetoothGatt: BluetoothGatt? = null
     private var writeCharacteristic: BluetoothGattCharacteristic? = null
-    private val TARGET_DEVICE_NAME = "ELK-BLEDOB"
     private val WRITE_SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb"
     private val WRITE_CHAR_UUID = "0000fff3-0000-1000-8000-00805f9b34fb"
     private var isConnected = false
@@ -45,17 +47,21 @@ class MainActivity : AppCompatActivity() {
     private val SAMPLE_RATE = 44100
     private val BUFFER_SIZE = 4096
 
+    // FFT
+    private val fft = FloatFFT_1D(BUFFER_SIZE.toLong())
+
+    // Sensitivity (1-10, default 5)
+    private var sensitivity = 5f
+
     // Handler for UI updates
     private val handler = Handler(Looper.getMainLooper())
 
-    // Permission request code
     private val PERMISSION_REQUEST_CODE = 100
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Init UI
         tvStatus = findViewById(R.id.tvStatus)
         tvBass = findViewById(R.id.tvBass)
         tvMid = findViewById(R.id.tvMid)
@@ -63,9 +69,22 @@ class MainActivity : AppCompatActivity() {
         colorPreview = findViewById(R.id.colorPreview)
         btnConnect = findViewById(R.id.btnConnect)
         btnStartStop = findViewById(R.id.btnStartStop)
+        seekBarSensitivity = findViewById(R.id.seekBarSensitivity)
+        tvSensitivity = findViewById(R.id.tvSensitivity)
 
         btnConnect.setOnClickListener { checkPermissionsAndScan() }
         btnStartStop.setOnClickListener { toggleSync() }
+
+        seekBarSensitivity.max = 9
+        seekBarSensitivity.progress = 4
+        seekBarSensitivity.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                sensitivity = (progress + 1).toFloat()
+                tvSensitivity.text = "Sensitivity: ${(progress + 1)}"
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar) {}
+        })
     }
 
     // ─── Permissions ────────────────────────────────────────────────
@@ -126,7 +145,6 @@ class MainActivity : AppCompatActivity() {
         }
         scanner.startScan(callback)
 
-        // Stop scan after 10 seconds if not found
         handler.postDelayed({
             if (isScanning) {
                 scanner.stopScan(object : ScanCallback() {})
@@ -163,16 +181,14 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
-                val service = gatt.getService(
-                    java.util.UUID.fromString(WRITE_SERVICE_UUID)
-                )
+                val service = gatt.getService(java.util.UUID.fromString(WRITE_SERVICE_UUID))
                 writeCharacteristic = service?.getCharacteristic(
                     java.util.UUID.fromString(WRITE_CHAR_UUID)
                 )
                 if (writeCharacteristic != null) {
                     isConnected = true
                     handler.post {
-                        updateStatus("Connected to ELK-BLEDOM ✓")
+                        updateStatus("Connected ✓")
                         btnStartStop.isEnabled = true
                         btnConnect.isEnabled = false
                     }
@@ -197,7 +213,6 @@ class MainActivity : AppCompatActivity() {
                 this, Manifest.permission.BLUETOOTH_CONNECT
             ) != PackageManager.PERMISSION_GRANTED
         ) return
-
         characteristic.value = command
         characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
         bluetoothGatt?.writeCharacteristic(characteristic)
@@ -206,11 +221,7 @@ class MainActivity : AppCompatActivity() {
     // ─── Audio Sync ──────────────────────────────────────────────────
 
     private fun toggleSync() {
-        if (isRunning) {
-            stopSync()
-        } else {
-            startSync()
-        }
+        if (isRunning) stopSync() else startSync()
     }
 
     private fun startSync() {
@@ -234,9 +245,7 @@ class MainActivity : AppCompatActivity() {
             val buffer = ShortArray(BUFFER_SIZE)
             while (isRunning) {
                 val read = audioRecord?.read(buffer, 0, BUFFER_SIZE) ?: 0
-                if (read > 0) {
-                    processAudio(buffer, read)
-                }
+                if (read > 0) processAudio(buffer, read)
             }
         }.start()
     }
@@ -256,29 +265,39 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ─── FFT & Color Mapping ─────────────────────────────────────────
+    // ─── True FFT Analysis ───────────────────────────────────────────
 
     private fun processAudio(buffer: ShortArray, read: Int) {
-        // Convert to float
-        val samples = FloatArray(read) { buffer[it] / 32768f }
+        // Convert shorts to float array for FFT
+        val fftBuffer = FloatArray(BUFFER_SIZE * 2)
+        for (i in 0 until read) {
+            fftBuffer[i] = buffer[i] / 32768f
+        }
 
-        // Simple energy calculation per frequency band
-        // We split the buffer into thirds as a lightweight band approximation
-        val third = read / 3
+        // Run FFT
+        fft.realForwardFull(fftBuffer)
 
-        val bassEnergy = rms(samples, 0, third)
-        val midEnergy = rms(samples, third, third * 2)
-        val highEnergy = rms(samples, third * 2, read)
+        // Each FFT bin = SAMPLE_RATE / BUFFER_SIZE = ~10.8 Hz per bin
+        val hzPerBin = SAMPLE_RATE.toFloat() / BUFFER_SIZE
 
-        // Scale to 0-255
-        val r = (bassEnergy * 800f).coerceIn(0f, 255f).toInt()
-        val g = (midEnergy * 800f).coerceIn(0f, 255f).toInt()
-        val b = (highEnergy * 800f).coerceIn(0f, 255f).toInt()
+        // Define frequency band ranges in bins
+        val bassEnd = (250f / hzPerBin).toInt()        // 0 - 250 Hz
+        val midEnd = (4000f / hzPerBin).toInt()        // 250 - 4000 Hz
+        val highEnd = (BUFFER_SIZE / 2)                // 4000 - 20000 Hz
 
-        // Send to strip
+        // Calculate energy in each band
+        val bassEnergy = bandEnergy(fftBuffer, 1, bassEnd)
+        val midEnergy = bandEnergy(fftBuffer, bassEnd, midEnd)
+        val highEnergy = bandEnergy(fftBuffer, midEnd, highEnd)
+
+        // Apply sensitivity and scale to 0-255
+        val scale = sensitivity * 150f
+        val r = (bassEnergy * scale).coerceIn(0f, 255f).toInt()
+        val g = (midEnergy * scale).coerceIn(0f, 255f).toInt()
+        val b = (highEnergy * scale).coerceIn(0f, 255f).toInt()
+
         sendColor(r, g, b)
 
-        // Update UI
         handler.post {
             tvBass.text = "BASS: $r"
             tvMid.text = "MID: $g"
@@ -287,10 +306,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun rms(samples: FloatArray, start: Int, end: Int): Float {
+    private fun bandEnergy(fftBuffer: FloatArray, startBin: Int, endBin: Int): Float {
         var sum = 0f
-        for (i in start until end) sum += samples[i] * samples[i]
-        return sqrt(sum / (end - start))
+        for (i in startBin until endBin) {
+            val real = fftBuffer[2 * i]
+            val imag = fftBuffer[2 * i + 1]
+            sum += sqrt(real * real + imag * imag)
+        }
+        return sum / (endBin - startBin)
     }
 
     // ─── Helpers ────────────────────────────────────────────────────
@@ -309,8 +332,6 @@ class MainActivity : AppCompatActivity() {
         if (ActivityCompat.checkSelfPermission(
                 this, Manifest.permission.BLUETOOTH_CONNECT
             ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            bluetoothGatt?.close()
-        }
+        ) bluetoothGatt?.close()
     }
 }
