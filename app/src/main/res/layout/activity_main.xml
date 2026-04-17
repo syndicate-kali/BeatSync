@@ -12,7 +12,8 @@
         android:layout_height="wrap_content"
         android:text="Not Connected"
         android:textColor="#FFFFFF"
-        android:textSize="16sp"
+        android:textSize="18sp"
+        android:textStyle="bold"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -20,9 +21,10 @@
 
     <View
         android:id="@+id/colorPreview"
-        android:layout_width="180dp"
-        android:layout_height="180dp"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
         android:background="@drawable/circle_shape"
+        android:backgroundTint="#222222"
         app:layout_constraintTop_toBottomOf="@id/tvStatus"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -32,7 +34,7 @@
         android:id="@+id/tvBass"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="BASS: 0"
+        android:text="BASS: 0.0"
         android:textColor="#FF4444"
         android:textSize="14sp"
         app:layout_constraintTop_toBottomOf="@id/colorPreview"
@@ -44,8 +46,8 @@
         android:id="@+id/tvMid"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="MID: 0"
-        android:textColor="#44FF44"
+        android:text="THRESH: 0.0"
+        android:textColor="#FFFFFF"
         android:textSize="14sp"
         app:layout_constraintTop_toBottomOf="@id/colorPreview"
         app:layout_constraintStart_toStartOf="parent"
@@ -56,7 +58,7 @@
         android:id="@+id/tvHigh"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="HIGH: 0"
+        android:text="BRIGHT: 0%"
         android:textColor="#4444FF"
         android:textSize="14sp"
         app:layout_constraintTop_toBottomOf="@id/colorPreview"
@@ -66,9 +68,9 @@
 
     <Button
         android:id="@+id/btnConnect"
-        android:layout_width="200dp"
+        android:layout_width="220dp"
         android:layout_height="wrap_content"
-        android:text="Scan for Strip"
+        android:text="Scan for LED Strip"
         android:backgroundTint="#BB86FC"
         app:layout_constraintTop_toBottomOf="@id/tvBass"
         app:layout_constraintStart_toStartOf="parent"
@@ -77,34 +79,37 @@
 
     <Button
         android:id="@+id/btnStartStop"
-        android:layout_width="200dp"
+        android:layout_width="220dp"
         android:layout_height="wrap_content"
-        android:text="Start Sync"
+        android:text="Start Light Show"
         android:backgroundTint="#03DAC5"
         android:enabled="false"
         app:layout_constraintTop_toBottomOf="@id/btnConnect"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="16dp"/>
+
     <TextView
         android:id="@+id/tvSensitivity"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Sensitivity: 5"
         android:textColor="#FFFFFF"
-        android:textSize="14sp"
+        android:textSize="16sp"
         app:layout_constraintTop_toBottomOf="@id/btnStartStop"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="24dp"/>
+        android:layout_marginTop="32dp"/>
 
     <SeekBar
         android:id="@+id/seekBarSensitivity"
-        android:layout_width="280dp"
+        android:layout_width="300dp"
         android:layout_height="wrap_content"
+        android:progressTint="#BB86FC"
+        android:thumbTint="#BB86FC"
         app:layout_constraintTop_toBottomOf="@id/tvSensitivity"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="8dp"/>
+        android:layout_marginTop="12dp"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
